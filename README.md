@@ -1,70 +1,68 @@
-# React + TypeScript + Vite
+# Resume Builder
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This project is a **proof of concept** for building resumes from a single source of truth.  
+Instead of writing separate logic for each export format, we define a small set of **React primitives** and use them to render both PDF and DOCX.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Architecture
 
-## Expanding the ESLint configuration
+### 1. Parsing
+We start with a React tree written using custom primitives such as `<Doc>`, `<Section>`, and `<Text>`:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+```jsx
+<Section>
+  <Text>Hello World</Text>
+</Section>
+```
+This JSX is parsed into an intermediate representation (IR):
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
+```json
+[
   {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+    "kind": "section",
+    "children": [
+      {
+        "kind": "text",
+        "text": "Hello World",
+        "styles": {}
+      }
+    ]
+  }
+]
+```
+The IR (intermediate representation) is a format-agnostic schema describing the structure of the resume.
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+### 2. Transforming
+Once we have the IR (intermediate representation), we pass it to a transformer. Each transformer knows how to walk the schema and produce output for a specific format.
+	•	transformToPDF → builds React-PDF nodes
+	•	transformToDOCX → builds docx API objects
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+**Example**
+**Input**
+```json
+[
+  {
+    "kind": "section",
+    "children": [
+      { "kind": "text", "text": "Hello World", "styles": {} }
+    ]
+  }
+]
+```
+**Output (PDF transformer):**
+```jsx
+import { View, Text } from "@react-pdf/renderer";
+
+<View>
+  <Text>Hello World</Text>
+</View>
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 3. Rendering
+Finally, each transformer output is passed to an existing library that takes care of producing the final binary file:
+	•	PDF → @react-pdf/renderer → Buffer / Stream
+	•	DOCX → docx → Buffer
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Rendering is straightforward. The heavy lifting happens in parsing and transforming, which ensure both formats stay consistent.
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-# resume-builder
